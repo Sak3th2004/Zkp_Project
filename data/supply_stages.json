@@ -1,0 +1,6 @@
+[
+  {"stage": "Harvest", "doc": "Lot-21A", "gps": "12.1,77.1"},
+  {"stage": "Processing", "doc": "Lot-21B", "gps": "12.5,77.4"},
+  {"stage": "Packaging", "doc": "Lot-21C", "gps": "13.0,77.6"},
+  {"stage": "Shipping", "doc": "Lot-21D", "gps": "13.5,77.9"}
+]

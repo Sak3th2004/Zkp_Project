@@ -1,0 +1,7 @@
+[
+  {"voter_id": "V00001", "choice": "YES"},
+  {"voter_id": "V00002", "choice": "NO"},
+  {"voter_id": "V00003", "choice": "YES"},
+  {"voter_id": "V00004", "choice": "NO"},
+  {"voter_id": "V00005", "choice": "YES"}
+]

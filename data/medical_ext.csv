@@ -1,0 +1,4 @@
+record_id,patient,diagnosis,notes
+R10001,Ava,ConditionA,Stable on treatment
+R10002,Liam,ConditionB,Needs imaging
+R10003,Noah,ConditionC,Telehealth follow-up
