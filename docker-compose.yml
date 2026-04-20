@@ -1,0 +1,84 @@
+services:
+  # ── API Server ─────────────────────────────────────────────────────
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://zkp:zkp@db:5432/zkproofapi
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production-64chars}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production-64chars}
+      APP_ENV: development
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./api:/app/api
+      - ./zkp_engine:/app/zkp_engine
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Celery Worker ──────────────────────────────────────────────────
+  celery_worker:
+    build: .
+    command: celery -A api.tasks.celery_app worker -l info -c 4
+    environment:
+      DATABASE_URL: postgresql+asyncpg://zkp:zkp@db:5432/zkproofapi
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production-64chars}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ── Celery Beat (Scheduler) ───────────────────────────────────────
+  celery_beat:
+    build: .
+    command: celery -A api.tasks.celery_app beat -l info
+    depends_on:
+      - redis
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: zkproofapi
+      POSTGRES_USER: zkp
+      POSTGRES_PASSWORD: zkp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zkp -d zkproofapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  # ── Dashboard (React + Vite) ──────────────────────────────────────
+  # dashboard:
+  #   build: ./dashboard
+  #   ports:
+  #     - "3000:3000"
+  #   command: npm run dev
+
+  # ── Marketing Website (Next.js) ───────────────────────────────────
+  # website:
+  #   build: ./website
+  #   ports:
+  #     - "3001:3001"
+  #   command: npm run dev
+
+volumes:
+  pgdata:
