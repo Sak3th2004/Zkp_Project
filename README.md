@@ -1,115 +1,115 @@
-# Application of Zero Knowledge Proof Cryptographic Algorithm
+# ZKProofAPI
 
-## Overview
-A full-stack demonstrator that applies non-interactive Schnorr zero-knowledge proofs (secp256k1 + SHA-256 commitments) across six enterprise-grade workflows: secure voting, medical data sharing, supply chain provenance, identity verification, ML model auditing, and collaborative editing.
+> **Zero-Knowledge Authentication. Three Lines of Code.**
 
-## Key Capabilities
-- FastAPI backend with vectorized, multi-round Schnorr proof generation and verification.
-- Streamlit dashboard for driving simulations, uploading custom payloads, and viewing metrics.
-- SQLite persistence for metrics and per-application audit trails (elections, EHR, supply chain stages, KYC entries, ML audits, collaboration edits).
-- Monitoring hooks for entropy tracking, proof/verify timing, and tamper detection (Attack Test flow).
-- Dataset loaders for synthetic data plus support for reviewer-provided JSON/CSV/TXT uploads.
+A production-ready, multi-tenant SaaS platform that lets any website/app add zero-knowledge proof authentication via a simple REST API + SDK integration.
 
-## Repository Layout
+## 🏗️ Architecture
+
 ```
-config/              Curve, DB, and system constants
-src/core/            Schnorr math + hashing utilities
-src/backend/         FastAPI app, models, simulations, DB helpers
-src/frontend/        Streamlit dashboard
-src/datasets/        Dataset loaders
-src/monitoring/      Timing + structured logging utilities
-src/tests/           Pytest suite (core, integration, attack scenarios)
-data/                Sample datasets (voters, medical, supply, identity, edits, ML weights)
-scripts/             Deploy/test helpers, locustfile, API caller
-notebooks/           Analysis notebook for metrics visualization
-Dockerfile           Combined backend + frontend image
+┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
+│  Marketing   │     │  Developer   │     │   Client SDKs    │
+│   Website    │     │  Dashboard   │     │  (JS/Python)     │
+│  (Next.js)   │     │  (React+TS)  │     │                  │
+└──────┬───────┘     └──────┬───────┘     └────────┬─────────┘
+       │                    │                      │
+       └────────────────────┼──────────────────────┘
+                            │
+                    ┌───────▼────────┐
+                    │   FastAPI      │
+                    │   REST API     │
+                    │   /v1/*        │
+                    └───────┬────────┘
+                            │
+              ┌─────────────┼──────────────┐
+              │             │              │
+       ┌──────▼──────┐ ┌───▼────┐  ┌──────▼──────┐
+       │ PostgreSQL  │ │ Redis  │  │  Celery     │
+       │   (Data)    │ │(Cache) │  │  (Queue)    │
+       └─────────────┘ └────────┘  └─────────────┘
 ```
 
-## Prerequisites
-- Python 3.12+
-- Node is not required (Streamlit handles frontend)
-- (Optional) Docker / Docker Compose
+## 🔐 Core: ZKP Cryptographic Engine
 
-## Local Setup
+The `zkp_engine/` package implements Schnorr zero-knowledge proofs on the secp256k1 elliptic curve:
+
+- **Key Generation** — Secure keypair generation using `secrets.randbelow()`
+- **Proof Creation** — Non-interactive Schnorr proofs with optional message binding
+- **Proof Verification** — Constant-time verification: `s*G + e*P == R`
+- **Batch Processing** — Parallel proof generation/verification
+- **Challenge-Response** — Interactive authentication protocol
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **API** | Python 3.12+, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2 |
+| **Database** | PostgreSQL 16 (asyncpg) |
+| **Cache/Queue** | Redis 7, Celery |
+| **Dashboard** | React 18, TypeScript, Tailwind CSS 3, Vite |
+| **Website** | Next.js 14 (App Router) |
+| **SDKs** | TypeScript (npm), Python (PyPI) |
+| **DevOps** | Docker, GitHub Actions, Railway/Render |
+
+## 📁 Project Structure
+
+```
+zkproofapi/
+├── api/                    # FastAPI backend
+│   ├── routes/             # API endpoints (/v1/*)
+│   ├── middleware/          # Auth, rate limiting, logging
+│   ├── models/             # SQLAlchemy ORM models
+│   ├── schemas/            # Pydantic request/response schemas
+│   ├── services/           # Business logic layer
+│   └── tasks/              # Celery async tasks
+├── zkp_engine/             # Standalone crypto engine
+├── dashboard/              # React developer dashboard
+├── website/                # Next.js marketing site
+├── sdks/                   # JavaScript & Python SDKs
+├── tests/                  # Unit, integration, load tests
+├── migrations/             # Alembic database migrations
+└── monitoring/             # Prometheus + Grafana configs
+```
+
+## 🚀 Quick Start
+
 ```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
+# Clone and setup
+git clone https://github.com/Sak3th2004/Zkp_Project.git
+cd Zkp_Project
 
-## Running the Stack
-### Separate terminals
-```bash
-# Terminal 1: backend
-venv\Scripts\activate
-uvicorn src.backend.main:app --host 0.0.0.0 --port 8000
-
-# Terminal 2: frontend
-venv\Scripts\activate
-python -m streamlit run src/frontend/app.py --server.port 8501 --server.headless true
-```
-Navigate to http://localhost:8501.
-
-### Docker Compose
-```bash
+# Start with Docker
 docker compose up --build
-```
-Backend listens on :8000, Streamlit on :8501.
 
-## Using the Dashboard
-1. Choose an application from the sidebar (voting, medical, supply, identity, ml_audit, collab_edit).
-2. Adjust rounds (1–5) and batch size (1–10000). Higher rounds increase soundness.
-3. (Optional) Upload JSON/CSV/TXT data. Uploaded payloads are hashed before proof generation.
-4. Click **Run ZKP Chain Sim**. Results show chain validity, entropy, proof/verify times, and aggregates. Metrics are stored in `zkp.db`.
-5. Click **Attack Test** to demonstrate tamper rejection (backend returns HTTP 400 for the mutated proof).
-
-## Inspecting Backend Results
-```bash
-venv\Scripts\activate
-sqlite3 zkp.db "SELECT * FROM metrics ORDER BY id DESC LIMIT 5;"
-sqlite3 zkp.db "SELECT voter_hash, valid FROM elections LIMIT 5;"  # replace with ehr, supply_chain, kyc, ml_audits, collab_edits
-```
-Logs from Uvicorn show entropy values and per-request timing (structlog JSON lines).
-
-## Testing
-```bash
-venv\Scripts\activate
-pytest -q
-```
-For load simulation:
-```bash
-locust -f scripts/locustfile.py --headless -u 50 -r 10 --run-time 30s
+# API: http://localhost:8000
+# Dashboard: http://localhost:3000
+# Docs: http://localhost:8000/docs
 ```
 
-## Analysis Notebook
-Run `notebooks/analysis.ipynb` (after generating metrics) to plot proof/verify times per application.
+## 📡 API Endpoints
 
-## Deployment Script
-`scripts/deploy.sh` installs requirements and launches both servers. `scripts/test_full.sh` runs pytest and locust sequentially.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/v1/keys/generate` | Generate a new ZKP keypair |
+| `POST` | `/v1/proofs/create` | Create a zero-knowledge proof |
+| `POST` | `/v1/proofs/verify` | Verify a proof |
+| `POST` | `/v1/proofs/batch` | Batch create/verify (async) |
+| `POST` | `/v1/auth/challenge` | Start ZKP auth flow |
+| `POST` | `/v1/auth/respond` | Complete ZKP auth |
+| `GET`  | `/v1/usage` | Current usage metrics |
+| `GET`  | `/v1/health` | Health check |
 
-## CI/CD or Further Automation
-- Add GitHub Actions to run `pytest -q` on pull requests.
-- Publish Docker image (`docker build -t zkp-app .`) and push to registry for cloud deployment.
+## 💰 Pricing Plans
 
-## Version Control Workflow
-1. Initialize repo and add remote:
-```bash
-git init
-git remote add origin https://github.com/Sak3th2004/Zkp_Project.git
-```
-2. Track files and commit:
-```bash
-git add .
-git commit -m "Add ZKP application stack"
-```
-3. Push to GitHub:
-```bash
-git push -u origin main
-```
-If `main` doesn’t exist yet, create it (`git branch -M main`).
+| Feature | Free | Pro ($29/mo) | Enterprise |
+|---------|------|-------------|------------|
+| Proofs/month | 1,000 | 50,000 | Unlimited |
+| Verifications/month | 5,000 | 250,000 | Unlimited |
+| API Keys | 2 | 10 | Unlimited |
+| Batch Operations | — | ✅ | ✅ |
+| Webhooks | — | ✅ | ✅ |
+| Rate Limit | 100/min | 1,000/min | 10,000/min |
 
-## Future Enhancements
-- Add authentication around the dashboard and APIs.
-- Integrate a message queue for large batch jobs.
-- Provide exportable audit reports (PDF/CSV) per application run.
-- Extend dataset loaders to fetch from live sources (e.g., REST APIs) with anonymization filters.
+## 📝 License
+
+MIT
