@@ -12,7 +12,7 @@ from api.config import settings
 from api.middleware.rate_limiter import RateLimiterMiddleware
 from api.middleware.request_id import RequestIdMiddleware
 from api.middleware.request_logger import RequestLoggerMiddleware
-from api.routes import auth, batch, dashboard_auth, dashboard_keys, health, keys, proofs, usage
+from api.routes import auth, batch, billing, dashboard_auth, dashboard_keys, health, keys, proofs, usage
 
 
 def _configure_logging() -> None:
@@ -77,6 +77,7 @@ def create_app() -> FastAPI:
     application.include_router(usage.router)
     application.include_router(dashboard_auth.router)
     application.include_router(dashboard_keys.router)
+    application.include_router(billing.router)
 
     return application
 
