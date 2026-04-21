@@ -1,0 +1,26 @@
+{
+  "name": "@zkproofapi/sdk",
+  "version": "1.0.0",
+  "description": "Official JavaScript/TypeScript SDK for ZKProofAPI — Zero-Knowledge Proof Authentication",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["zkp", "zero-knowledge", "authentication", "schnorr", "proof", "crypto"],
+  "author": "ZKProofAPI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sak3th2004/Zkp_Project"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

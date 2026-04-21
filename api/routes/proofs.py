@@ -6,9 +6,11 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import AuthenticatedOrg, get_current_org
+from api.models.database import get_db
 from api.schemas.proofs import (
     CommitmentSchema,
     ProofCreateRequest,
@@ -17,7 +19,9 @@ from api.schemas.proofs import (
     ProofVerifyRequest,
     ProofVerifyResponse,
 )
-from zkp_engine import KeyPair, SchnorrProver, SchnorrVerifier
+from api.services.proof_logger import log_proof_operation
+from api.services.usage_service import check_usage_limit, increment_usage
+from zkp_engine import SchnorrProver, SchnorrVerifier
 from zkp_engine.utils import bytes_to_point, generate_proof_id
 
 router = APIRouter(tags=["Proofs"])
@@ -26,10 +30,19 @@ router = APIRouter(tags=["Proofs"])
 @router.post("/v1/proofs/create", response_model=ProofCreateResponse, status_code=201)
 async def create_proof(
     body: ProofCreateRequest,
+    request: Request,
     auth: AuthenticatedOrg = Depends(get_current_org),
+    db: AsyncSession = Depends(get_db),
 ) -> ProofCreateResponse:
     """Generate a zero-knowledge proof."""
     start = time.perf_counter()
+
+    # Check usage limit
+    allowed, current, limit = await check_usage_limit(db, auth.org, "proof_create")
+    if not allowed:
+        raise HTTPException(status_code=402, detail={
+            "error": {"type": "usage_limit_exceeded", "message": f"Monthly proof limit reached ({current}/{limit})"}
+        })
 
     try:
         private_key = int(body.private_key, 16)
@@ -57,9 +70,20 @@ async def create_proof(
     assert last_proof is not None
 
     latency_ms = (time.perf_counter() - start) * 1000
+    proof_id = generate_proof_id()
+
+    # Track usage + audit log
+    await increment_usage(db, auth.org_id, "proof_create")
+    await log_proof_operation(
+        db, org_id=auth.org_id, api_key_id=auth.api_key.id,
+        operation="proof_create", status="success", latency_ms=round(latency_ms, 2),
+        proof_id=proof_id,
+        request_ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
 
     return ProofCreateResponse(
-        proof_id=generate_proof_id(),
+        proof_id=proof_id,
         proof=ProofDataSchema(
             commitment=CommitmentSchema(
                 x=format(last_proof.commitment_x, "x"),
@@ -79,10 +103,19 @@ async def create_proof(
 @router.post("/v1/proofs/verify", response_model=ProofVerifyResponse)
 async def verify_proof(
     body: ProofVerifyRequest,
+    request: Request,
     auth: AuthenticatedOrg = Depends(get_current_org),
+    db: AsyncSession = Depends(get_db),
 ) -> ProofVerifyResponse:
     """Verify a zero-knowledge proof."""
     start = time.perf_counter()
+
+    # Check usage limit
+    allowed, current, limit = await check_usage_limit(db, auth.org, "proof_verify")
+    if not allowed:
+        raise HTTPException(status_code=402, detail={
+            "error": {"type": "usage_limit_exceeded", "message": f"Monthly verify limit reached ({current}/{limit})"}
+        })
 
     try:
         pub_bytes = bytes.fromhex(body.public_key)
@@ -115,10 +148,21 @@ async def verify_proof(
         valid = verifier.verify(proof)
 
     latency_ms = (time.perf_counter() - start) * 1000
+    proof_id = generate_proof_id()
+
+    # Track usage + audit log
+    await increment_usage(db, auth.org_id, "proof_verify")
+    await log_proof_operation(
+        db, org_id=auth.org_id, api_key_id=auth.api_key.id,
+        operation="proof_verify", status="success" if valid else "failure",
+        latency_ms=round(latency_ms, 2), proof_id=proof_id,
+        request_ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
 
     return ProofVerifyResponse(
         valid=valid,
-        proof_id=generate_proof_id(),
+        proof_id=proof_id,
         verification_id=f"vrf_{uuid.uuid4().hex[:16]}",
         latency_ms=round(latency_ms, 2),
         verified_at=datetime.now(timezone.utc),

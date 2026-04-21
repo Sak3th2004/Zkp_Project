@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zkproofapi"
+version = "1.0.0"
+description = "Official Python SDK for ZKProofAPI — Zero-Knowledge Proof Authentication"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "ZKProofAPI", email = "support@zkproofapi.com"}]
+keywords = ["zkp", "zero-knowledge", "authentication", "schnorr", "proof"]
+dependencies = ["httpx>=0.25.0"]
+
+[project.urls]
+Homepage = "https://zkproofapi.com"
+Documentation = "https://docs.zkproofapi.com"
+Repository = "https://github.com/Sak3th2004/Zkp_Project"

@@ -12,6 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.config import settings
+from api.dependencies_jwt import CurrentUser
+from api.dependencies_jwt import get_current_user as get_current_user_dep
 from api.models.database import get_db
 from api.models.organization import Organization
 from api.models.user import User
@@ -104,9 +106,16 @@ async def login(
 
 
 @router.get("/me", response_model=UserInfo)
-async def get_current_user(
-    # TODO: add JWT dependency injection
-    db: AsyncSession = Depends(get_db),
+async def get_me(
+    current: "CurrentUser" = Depends(get_current_user_dep),
 ) -> UserInfo:
     """Get current authenticated user info."""
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    return UserInfo(
+        id=str(current.user.id),
+        email=current.user.email,
+        full_name=current.user.full_name,
+        role=current.user.role,
+        org_id=str(current.org.id),
+        org_name=current.org.name,
+        plan=current.org.plan,
+    )
