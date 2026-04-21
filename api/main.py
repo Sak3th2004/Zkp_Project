@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import settings
+from api.middleware.metrics import MetricsMiddleware
+from api.middleware.metrics import router as metrics_router
 from api.middleware.rate_limiter import RateLimiterMiddleware
 from api.middleware.request_id import RequestIdMiddleware
 from api.middleware.request_logger import RequestLoggerMiddleware
@@ -56,6 +58,7 @@ def create_app() -> FastAPI:
     )
 
     # ── Middleware (applied in reverse order — last added runs first) ────
+    application.add_middleware(MetricsMiddleware)
     application.add_middleware(RequestLoggerMiddleware)
     application.add_middleware(RateLimiterMiddleware)
     application.add_middleware(RequestIdMiddleware)
@@ -78,6 +81,7 @@ def create_app() -> FastAPI:
     application.include_router(dashboard_auth.router)
     application.include_router(dashboard_keys.router)
     application.include_router(billing.router)
+    application.include_router(metrics_router)
 
     return application
 
