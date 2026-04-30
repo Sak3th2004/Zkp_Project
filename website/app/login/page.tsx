@@ -24,7 +24,8 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Login failed");
       localStorage.setItem("zkp_token", data.access_token);
-      window.location.href = "http://localhost:3000/dashboard";
+      // Show success — redirect to API docs
+      window.location.href = "http://localhost:8000/docs";
     } catch (err: any) {
       setError(err.message);
     }

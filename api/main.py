@@ -40,6 +40,13 @@ async def lifespan(app: FastAPI):  # type: ignore[misc]
     """Application lifespan: startup and shutdown hooks."""
     _configure_logging()
     logger = structlog.get_logger("api.main")
+
+    # Auto-create tables (SQLite dev mode or first-time setup)
+    from api.models.database import DATABASE_URL, init_db
+    if "sqlite" in DATABASE_URL:
+        await logger.ainfo("database", mode="sqlite_dev", path=DATABASE_URL)
+    await init_db()
+
     await logger.ainfo("startup", version=settings.APP_VERSION, env=settings.APP_ENV)
     yield
     await logger.ainfo("shutdown")
