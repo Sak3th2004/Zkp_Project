@@ -11,12 +11,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Generate chart data — in production this comes from analytics API
-  const chartData = Array.from({ length: 30 }, (_, i) => ({
-    day: `Day ${i + 1}`,
-    proofs: Math.floor(Math.random() * 500 + 200),
-    verifications: Math.floor(Math.random() * 1200 + 400),
-  }));
+  // Chart data will be populated from real analytics API once usage begins
+  const [chartData] = useState<{day: string; proofs: number; verifications: number}[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -97,7 +93,8 @@ export default function Dashboard() {
 
       {/* Chart */}
       <div className="mb-8 rounded-xl border border-border bg-surface-2 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-text">Proof & Verification Volume (Sample Data)</h2>
+        <h2 className="mb-4 text-lg font-semibold text-text">Proof & Verification Volume</h2>
+        {chartData.length > 0 ? (
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -113,6 +110,15 @@ export default function Dashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+        ) : (
+        <div className="flex h-48 items-center justify-center text-center">
+          <div>
+            <Fingerprint className="mx-auto h-10 w-10 text-text-muted mb-3" />
+            <p className="text-sm text-text-secondary">No usage data yet</p>
+            <p className="text-xs text-text-muted mt-1">Create proofs via the API or Playground to see real-time analytics</p>
+          </div>
+        </div>
+        )}
       </div>
 
       {/* Bottom Row */}
