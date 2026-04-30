@@ -1,47 +1,103 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Fingerprint, Clock, Zap, Key, BookOpen, ArrowUpRight } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Clock, Zap, Key, BookOpen, ArrowUpRight, Loader2, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import StatsCard from '../components/StatsCard';
-
-const chartData = Array.from({ length: 30 }, (_, i) => ({
-  day: `Apr ${i + 1}`,
-  proofs: Math.floor(Math.random() * 500 + 200),
-  verifications: Math.floor(Math.random() * 1200 + 400),
-}));
-
-const recentActivity = [
-  { op: 'proof_verify', status: 'success', key: 'sk_live_a1b2…', latency: '3.2ms', time: '2 min ago' },
-  { op: 'key_generate', status: 'success', key: 'sk_live_a1b2…', latency: '12.4ms', time: '5 min ago' },
-  { op: 'proof_create', status: 'success', key: 'sk_test_x9y8…', latency: '8.1ms', time: '8 min ago' },
-  { op: 'auth_respond', status: 'failure', key: 'sk_live_a1b2…', latency: '6.7ms', time: '12 min ago' },
-  { op: 'proof_verify', status: 'success', key: 'sk_live_a1b2…', latency: '2.9ms', time: '15 min ago' },
-];
+import { authAPI, usageAPI, zkpAPI } from '../api/services';
 
 export default function Dashboard() {
+  const [user, setUser] = useState<any>(null);
+  const [health, setHealth] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Generate chart data — in production this comes from analytics API
+  const chartData = Array.from({ length: 30 }, (_, i) => ({
+    day: `Day ${i + 1}`,
+    proofs: Math.floor(Math.random() * 500 + 200),
+    verifications: Math.floor(Math.random() * 1200 + 400),
+  }));
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [meRes, healthRes] = await Promise.allSettled([
+          authAPI.me(),
+          zkpAPI.healthCheck(),
+        ]);
+
+        if (meRes.status === 'fulfilled') setUser(meRes.value.data);
+        if (healthRes.status === 'fulfilled') setHealth(healthRes.value.data);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load dashboard');
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const orgName = user?.org_name || 'Your Organization';
+  const plan = user?.plan || 'free';
+
   return (
     <div>
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text">Dashboard</h1>
-          <p className="mt-1 text-sm text-text-secondary">Welcome back — here's your overview</p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Welcome back{user?.full_name ? `, ${user.full_name}` : ''} — here&apos;s your overview
+          </p>
         </div>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-light uppercase tracking-wider">
-          Free Plan
+          {plan} Plan
         </span>
       </div>
 
+      {error && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Health Status */}
+      {health && (
+        <div className="mb-6 flex items-center gap-4 rounded-xl border border-border bg-surface-2 px-4 py-3">
+          <span className={`h-2 w-2 rounded-full ${health.status === 'healthy' ? 'bg-success' : 'bg-danger'}`} />
+          <span className="text-sm text-text">
+            API Status: <strong className="text-success">{health.status}</strong>
+          </span>
+          <span className="text-xs text-text-muted">v{health.version}</span>
+          {health.checks && (
+            <div className="flex gap-3 ml-auto text-xs text-text-muted">
+              {Object.entries(health.checks).map(([key, val]) => (
+                <span key={key}>{key}: <span className={val === 'ok' ? 'text-success' : 'text-danger'}>{String(val)}</span></span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard icon={Fingerprint} label="Today's Proofs" value="1,247" change="+12.5%" changeType="up" color="primary" />
-        <StatsCard icon={ShieldCheck} label="Today's Verifications" value="3,891" change="+8.3%" changeType="up" color="success" />
-        <StatsCard icon={Zap} label="Monthly Usage" value="67%" change="670 / 1,000" changeType="neutral" color="warning" />
-        <StatsCard icon={Clock} label="Avg Latency (p95)" value="4.2ms" change="-0.8ms" changeType="up" color="accent" />
+        <StatsCard icon={Fingerprint} label="Today's Proofs" value="—" change="Connect to see" changeType="neutral" color="primary" />
+        <StatsCard icon={ShieldCheck} label="Today's Verifications" value="—" change="Connect to see" changeType="neutral" color="success" />
+        <StatsCard icon={Zap} label="Plan" value={plan.toUpperCase()} change={orgName} changeType="neutral" color="warning" />
+        <StatsCard icon={Clock} label="Avg Latency" value="<5ms" change="Schnorr proofs" changeType="up" color="accent" />
       </div>
 
       {/* Chart */}
       <div className="mb-8 rounded-xl border border-border bg-surface-2 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-text">Proof & Verification Volume</h2>
+        <h2 className="mb-4 text-lg font-semibold text-text">Proof & Verification Volume (Sample Data)</h2>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -61,34 +117,14 @@ export default function Dashboard() {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 rounded-xl border border-border bg-surface-2 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-text">Recent Activity</h2>
-          <div className="space-y-3">
-            {recentActivity.map((item, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg bg-surface px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <span className={`h-2 w-2 rounded-full ${item.status === 'success' ? 'bg-success' : 'bg-danger'}`} />
-                  <span className="text-sm font-medium text-text">{item.op}</span>
-                  <span className="text-xs text-text-muted font-mono">{item.key}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-text-muted">{item.latency}</span>
-                  <span className="text-xs text-text-muted">{item.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Quick Actions */}
-        <div className="rounded-xl border border-border bg-surface-2 p-6">
+        <div className="lg:col-span-2 rounded-xl border border-border bg-surface-2 p-6">
           <h2 className="mb-4 text-lg font-semibold text-text">Quick Actions</h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { to: '/dashboard/keys', icon: Key, label: 'Create API Key', desc: 'Generate a new key' },
               { to: '/dashboard/quickstart', icon: BookOpen, label: 'View Docs', desc: 'Integration guide' },
-              { to: '/dashboard/billing', icon: ArrowUpRight, label: 'Upgrade Plan', desc: 'Unlock more proofs' },
+              { to: '/dashboard/playground', icon: Zap, label: 'Try Playground', desc: 'Test proofs live' },
             ].map(({ to, icon: Icon, label, desc }) => (
               <Link key={to} to={to}
                 className="flex items-center gap-4 rounded-lg border border-border bg-surface px-4 py-3 hover:border-primary/30 hover:bg-surface-3 transition-all duration-150">
@@ -101,6 +137,29 @@ export default function Dashboard() {
                 </div>
               </Link>
             ))}
+          </div>
+        </div>
+
+        {/* Organization Info */}
+        <div className="rounded-xl border border-border bg-surface-2 p-6">
+          <h2 className="mb-4 text-lg font-semibold text-text">Organization</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-text-muted">Name</span>
+              <span className="text-text font-medium">{orgName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Plan</span>
+              <span className="text-primary font-medium capitalize">{plan}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Role</span>
+              <span className="text-text">{user?.role || '—'}</span>
+            </div>
+            <Link to="/dashboard/billing"
+              className="block w-full mt-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-center text-sm font-medium text-primary hover:bg-primary/10 transition-all">
+              <ArrowUpRight className="inline h-4 w-4 mr-1" /> Upgrade Plan
+            </Link>
           </div>
         </div>
       </div>
